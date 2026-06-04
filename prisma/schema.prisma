@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Stock {
+  symbol           String              @id
+  name             String
+  exchange         String?
+  industry         String?
+  country          String?
+  marketCap        Float?
+  shareOutstanding Float?
+  freeFloat        Float?
+  website          String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  watchlistItem    WatchlistItem?
+  quoteSnapshots   QuoteSnapshot[]
+  catalysts        CatalystRecord[]
+  analysisReports  AnalysisReportRecord[]
+}
+
+model WatchlistItem {
+  id          String   @id @default(cuid())
+  symbol      String   @unique
+  isMonitored Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  stock       Stock    @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model ApiCache {
+  cacheKey   String   @id
+  provider   String
+  endpoint   String
+  payload    String
+  statusCode Int?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([provider])
+  @@index([expiresAt])
+}
+
+model QuoteSnapshot {
+  id            String   @id @default(cuid())
+  symbol        String
+  currentPrice  Float
+  change        Float
+  percentChange Float
+  open          Float
+  high          Float
+  low           Float
+  previousClose Float
+  volume        Float
+  source        String
+  asOf          DateTime
+  createdAt     DateTime @default(now())
+  stock         Stock    @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+
+  @@index([symbol, asOf])
+}
+
+model CatalystRecord {
+  id            String   @id
+  symbol        String
+  category      String
+  title         String
+  summary       String?
+  eventDate     DateTime
+  url           String?
+  source        String
+  sentimentHint String?
+  rawPayload    String?
+  createdAt     DateTime @default(now())
+  stock         Stock    @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+
+  @@index([symbol, eventDate])
+}
+
+model AnalysisReportRecord {
+  id          String   @id @default(cuid())
+  symbol      String
+  reportJson  String
+  generatedAt DateTime @default(now())
+  stock       Stock    @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+
+  @@index([symbol, generatedAt])
+}
+
+model ProviderLimitState {
+  provider          String   @id
+  minuteWindowStart DateTime
+  minuteCount       Int      @default(0)
+  dayWindowStart    DateTime
+  dayCount          Int      @default(0)
+  updatedAt         DateTime @updatedAt
+}
