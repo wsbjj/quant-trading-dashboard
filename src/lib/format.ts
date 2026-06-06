@@ -1,5 +1,5 @@
 export function formatPrice(value: number | null | undefined, decimals = 4) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "N/A";
+  if (value === null || value === undefined || Number.isNaN(value)) return "X";
   return value.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -7,7 +7,7 @@ export function formatPrice(value: number | null | undefined, decimals = 4) {
 }
 
 export function formatCompact(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "N/A";
+  if (value === null || value === undefined || Number.isNaN(value)) return "X";
   return Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: 2,
@@ -15,7 +15,7 @@ export function formatCompact(value: number | null | undefined) {
 }
 
 export function formatPercent(value: number | null | undefined, decimals = 2) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "N/A";
+  if (value === null || value === undefined || Number.isNaN(value)) return "X";
   return `${value.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,

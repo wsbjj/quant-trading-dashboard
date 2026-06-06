@@ -19,13 +19,14 @@ npm run prisma:push
 npm run dev
 ```
 
-默认打开 `http://localhost:3000`。
+默认打开 `http://localhost:3000`；如需改端口，修改 `.env` 里的 `PORT`。
 
 ## 环境变量
 
 `.env.example` 已列出第一阶段需要的变量：
 
 - `DATABASE_URL`：本地默认 `file:./dev.db`，对应 `prisma/dev.db`。
+- `PORT`：本地服务端口，默认 `3000`；修改后通过 `npm run dev` / `npm run start` 生效。
 - `FINNHUB_API_KEY`：必需数据源；缺失时搜索、quote、profile 会回落到 fixture。
 - `ALPHA_VANTAGE_API_KEY`：低频日线补充；缺失时使用 fixture 历史数据。
 - `OPENFDA_API_KEY`：可选；缺失时仍可按 openFDA 无 key 限额尝试请求。

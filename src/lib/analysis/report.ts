@@ -7,6 +7,22 @@ import {
   round,
 } from "./metrics";
 
+export type ReportLanguage = "zh" | "en";
+
+export type ReportCopy = {
+  catalystRationale: string;
+  squeezeLabel: string;
+  squeezeNotes: string[];
+  smartMoney: string[];
+  tradePlan: {
+    bullish: string[];
+    neutral: string[];
+    bearish: string[];
+  };
+  riskFactors: string[];
+  disclaimer: string;
+};
+
 export type CatalystGrade = {
   label: "BULLISH" | "NEUTRAL" | "BEARISH";
   score: number;
@@ -49,6 +65,7 @@ export type StockReport = {
     };
     riskFactors: string[];
   };
+  copy: Record<ReportLanguage, ReportCopy>;
   providerStatuses: NormalizedStockData["providerStatuses"];
   disclaimer: string;
 };
@@ -80,6 +97,14 @@ function buildMarketSection(data: NormalizedStockData) {
 }
 
 function buildCatalystGrade(events: CatalystEvent[]): CatalystGrade {
+  if (events.length === 0) {
+    return {
+      label: "NEUTRAL",
+      score: 5,
+      rationale: "X",
+    };
+  }
+
   let score = 5;
   for (const event of events) {
     if (event.sentimentHint === "bullish") score += 3;
@@ -117,7 +142,7 @@ function availability(value?: number | null) {
   return {
     value: null,
     status: "unavailable" as const,
-    note: "N/A / no free source configured",
+    note: "X",
   };
 }
 
@@ -139,13 +164,13 @@ function buildSqueezeSection(data: NormalizedStockData, volumeRatio: number | nu
     label: score >= 70 ? "HIGH SQUEEZE POTENTIAL" : score >= 40 ? "MODERATE SQUEEZE POTENTIAL" : "LOW SQUEEZE POTENTIAL",
     notes: [
       shortInterest.status === "unavailable"
-        ? "Short interest is not available from the configured free sources."
+        ? "X"
         : `Short interest at ${shortInterest.value}% contributes to squeeze baseline.`,
       daysToCover.status === "unavailable"
-        ? "Days to cover is not available from the configured free sources."
+        ? "X"
         : `Days to cover at ${daysToCover.value} supports squeeze scoring.`,
       costToBorrow.status === "unavailable"
-        ? "CTB is not available from the configured free sources."
+        ? "X"
         : `Cost to borrow at ${costToBorrow.value}% indicates elevated borrow costs.`,
       volumeRatio !== null && volumeRatio < 0.2
         ? "Low volume ratio indicates limited market participation."
@@ -195,24 +220,150 @@ function buildRiskFactors(data: NormalizedStockData) {
   return risks;
 }
 
+function gradeLabelZh(label: CatalystGrade["label"]) {
+  if (label === "BULLISH") return "偏多";
+  if (label === "BEARISH") return "偏空";
+  return "中性";
+}
+
+function buildCatalystRationaleZh(label: CatalystGrade["label"]) {
+  if (label === "BULLISH") return "近期催化剂可能带来关注和情绪，但融资与流动性风险会压低确定性。";
+  if (label === "BEARISH") return "现有事件更偏向风险、稀释或缺少强确认。";
+  return "存在催化剂流，但当前证据混合，确定性不高。";
+}
+
+function buildSqueezeLabelZh(label: string) {
+  if (/high/i.test(label)) return "高挤压潜力";
+  if (/moderate/i.test(label)) return "中等挤压潜力";
+  return "低挤压潜力";
+}
+
+function buildSqueezeNotesZh(squeeze: ReturnType<typeof buildSqueezeSection>, volumeRatio: number | null) {
+  return [
+    squeeze.shortInterest.status === "unavailable"
+      ? "X"
+      : `空头持仓比例为 ${squeeze.shortInterest.value}%，构成挤压评分基础。`,
+    squeeze.daysToCover.status === "unavailable"
+      ? "X"
+      : `Days to cover 为 ${squeeze.daysToCover.value}，支持挤压评分。`,
+    squeeze.costToBorrow.status === "unavailable"
+      ? "X"
+      : `借券成本为 ${squeeze.costToBorrow.value}%，显示借券成本偏高。`,
+    volumeRatio !== null && volumeRatio < 0.2
+      ? "成交量相对近期均量偏低，说明市场参与有限。"
+      : "成交参与度相对近期均量并非极度稀薄。",
+  ];
+}
+
+function buildSmartMoneyZh(structure: ReturnType<typeof buildStructureSection>, grade: CatalystGrade) {
+  return [
+    `重新站上并守住 ${structure.regularHigh.toFixed(4)} 将是第一个偏多信号。`,
+    `${structure.vwap.toFixed(4)} VWAP 是盘中关键参照与确认位。`,
+    `${structure.overnightHigh.toFixed(4)} 是下一个需要突破的主要阻力。`,
+    `${structure.supportZone.upper.toFixed(4)} - ${structure.supportZone.lower.toFixed(4)} 支撑区是必须守住的关键区域。`,
+    `整体：${gradeLabelZh(grade.label)}的催化剂驱动结构，价格行为需要按新闻和流动性敏感型处理。`,
+  ];
+}
+
+function buildTradePlanZh(structure: ReturnType<typeof buildStructureSection>) {
+  return {
+    bullish: [
+      `重新站上并守住 ${structure.regularHigh.toFixed(4)}。`,
+      `随后突破 ${structure.vwap.toFixed(4)} VWAP 作为确认。`,
+      `下一目标：${structure.overnightHigh.toFixed(4)} -> ${structure.fibonacci.extensions["1.272"].toFixed(4)}。`,
+    ],
+    neutral: [
+      `在 ${structure.supportZone.lower.toFixed(4)} 到 ${structure.regularHigh.toFixed(4)} 区间震荡。`,
+      `观察 ${structure.vwap.toFixed(4)} VWAP 判断盘中方向。`,
+      "等待突破或跌破确认。",
+    ],
+    bearish: [
+      `失守 ${structure.supportZone.upper.toFixed(4)} 支撑。`,
+      `下破目标：${structure.supportZone.lower.toFixed(4)} -> ${structure.majorSupport.toFixed(4)}。`,
+      `跌破 ${structure.failureLevel.toFixed(4)} 将提高下行风险。`,
+    ],
+  };
+}
+
+function buildRiskFactorsZh(data: NormalizedStockData) {
+  const risks = ["极低流动性和成交量可能导致价格走势剧烈且失真。", "高波动可能快速打破技术位。"];
+  if (data.catalysts.some((event) => /dilution|offering|financing/i.test(`${event.title} ${event.summary ?? ""}`))) {
+    risks.push("融资或稀释历史可能限制上行确定性。");
+  }
+  if ((data.profile.industry ?? "").toLowerCase().includes("bio")) {
+    risks.push("监管、临床和融资风险仍是生物科技标的的核心风险。");
+  }
+  return risks;
+}
+
+function buildReportCopy(input: {
+  data: NormalizedStockData;
+  grade: CatalystGrade;
+  squeeze: ReturnType<typeof buildSqueezeSection>;
+  structure: ReturnType<typeof buildStructureSection>;
+  smartMoney: string[];
+  tradePlan: ReportCopy["tradePlan"];
+  riskFactors: string[];
+  volumeRatio: number | null;
+}): Record<ReportLanguage, ReportCopy> {
+  return {
+    en: {
+      catalystRationale: input.grade.rationale,
+      squeezeLabel: input.squeeze.label,
+      squeezeNotes: input.squeeze.notes,
+      smartMoney: input.smartMoney,
+      tradePlan: input.tradePlan,
+      riskFactors: input.riskFactors,
+      disclaimer: "For educational purposes only. Not investment advice. Verify data independently and manage risk.",
+    },
+    zh: {
+      catalystRationale: buildCatalystRationaleZh(input.grade.label),
+      squeezeLabel: buildSqueezeLabelZh(input.squeeze.label),
+      squeezeNotes: buildSqueezeNotesZh(input.squeeze, input.volumeRatio),
+      smartMoney: buildSmartMoneyZh(input.structure, input.grade),
+      tradePlan: buildTradePlanZh(input.structure),
+      riskFactors: buildRiskFactorsZh(input.data),
+      disclaimer: "仅供教育用途，不构成投资建议。请自行核验数据并控制风险。",
+    },
+  };
+}
+
 export function buildRuleBasedReport(data: NormalizedStockData): StockReport {
   const market = buildMarketSection(data);
   const grade = buildCatalystGrade(data.catalysts);
   const squeeze = buildSqueezeSection(data, market.volumeRatio);
   const structure = buildStructureSection(data);
   const smartMoney = buildSmartMoney(structure, grade);
+  const tradePlan = {
+    bullish: [
+      `Reclaim and hold above ${structure.regularHigh.toFixed(4)}.`,
+      `Then clear ${structure.vwap.toFixed(4)} VWAP for confirmation.`,
+      `Next targets: ${structure.overnightHigh.toFixed(4)} -> ${structure.fibonacci.extensions["1.272"].toFixed(4)}.`,
+    ],
+    neutral: [
+      `Range between ${structure.supportZone.lower.toFixed(4)} and ${structure.regularHigh.toFixed(4)}.`,
+      `Watch ${structure.vwap.toFixed(4)} VWAP for intraday bias.`,
+      "Wait for breakout or breakdown confirmation.",
+    ],
+    bearish: [
+      `Lose ${structure.supportZone.upper.toFixed(4)} support.`,
+      `Breakdown targets: ${structure.supportZone.lower.toFixed(4)} -> ${structure.majorSupport.toFixed(4)}.`,
+      `Failure below ${structure.failureLevel.toFixed(4)} increases downside risk.`,
+    ],
+  };
+  const riskFactors = buildRiskFactors(data);
   const catalyst = {
     grade,
     events: data.catalysts,
     keyDriver:
       data.catalysts[0]?.title ??
-      "No recent free catalyst source found; monitor SEC, FDA, ClinicalTrials and company news updates.",
+      "X",
   };
 
   return {
     symbol: data.symbol,
     companyName: data.profile.name,
-    industry: data.profile.industry ?? "Unknown",
+    industry: data.profile.industry ?? "X",
     generatedAt: new Date().toISOString(),
     summary: {
       marketState: data.quote.marketState,
@@ -227,25 +378,19 @@ export function buildRuleBasedReport(data: NormalizedStockData): StockReport {
       squeeze,
       structure,
       smartMoney,
-      tradePlan: {
-        bullish: [
-          `Reclaim and hold above ${structure.regularHigh.toFixed(4)}.`,
-          `Then clear ${structure.vwap.toFixed(4)} VWAP for confirmation.`,
-          `Next targets: ${structure.overnightHigh.toFixed(4)} -> ${structure.fibonacci.extensions["1.272"].toFixed(4)}.`,
-        ],
-        neutral: [
-          `Range between ${structure.supportZone.lower.toFixed(4)} and ${structure.regularHigh.toFixed(4)}.`,
-          `Watch ${structure.vwap.toFixed(4)} VWAP for intraday bias.`,
-          "Wait for breakout or breakdown confirmation.",
-        ],
-        bearish: [
-          `Lose ${structure.supportZone.upper.toFixed(4)} support.`,
-          `Breakdown targets: ${structure.supportZone.lower.toFixed(4)} -> ${structure.majorSupport.toFixed(4)}.`,
-          `Failure below ${structure.failureLevel.toFixed(4)} increases downside risk.`,
-        ],
-      },
-      riskFactors: buildRiskFactors(data),
+      tradePlan,
+      riskFactors,
     },
+    copy: buildReportCopy({
+      data,
+      grade,
+      squeeze,
+      structure,
+      smartMoney,
+      tradePlan,
+      riskFactors,
+      volumeRatio: market.volumeRatio,
+    }),
     providerStatuses: data.providerStatuses,
     disclaimer: "仅供教育用途，不构成投资建议。请自行核验数据并控制风险。",
   };
