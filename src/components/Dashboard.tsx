@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, BarChart3, Plus, RefreshCw, Search, Settings, ShieldCheck, Star, Trash2 } from "lucide-react";
+import { Activity, BarChart3, Database, Plus, RefreshCw, Search, Settings, ShieldCheck, Star, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { formatCompact, formatPrice, formatPercent } from "@/lib/format";
 import type { NormalizedQuote, SymbolSearchResult } from "@/lib/types";
@@ -160,6 +160,10 @@ export default function Dashboard() {
             <h1 className="mt-2 text-3xl font-black md:text-5xl">股票催化剂分析仪表盘</h1>
           </div>
           <nav className="flex flex-wrap gap-2">
+            <Link href="/data" className="inline-flex items-center gap-2 border border-zinc-700 px-3 py-2 text-sm hover:border-yellow-400">
+              <Database size={16} />
+              历史数据
+            </Link>
             <Link href="/settings" className="inline-flex items-center gap-2 border border-zinc-700 px-3 py-2 text-sm hover:border-yellow-400">
               <Settings size={16} />
               设置
